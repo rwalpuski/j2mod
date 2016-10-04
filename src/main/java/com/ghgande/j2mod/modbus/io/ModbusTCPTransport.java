@@ -221,24 +221,47 @@ public class ModbusTCPTransport extends AbstractModbusTransport {
                 byte[] buffer = byteInputStream.getBuffer();
 
                 if (!headless) {
-                    if (dataInputStream.read(buffer, 0, 6) == -1) {
-                        throw new EOFException("Premature end of stream (Header truncated)");
-                    }
+                    int len_remaining = Modbus.TCP_HEADER_LENGTH;
+                    int read = 0;
+                    int transaction = 0;
+                    int protocol = 0;
+                    int count = 0;
+                    boolean len_found = false;
+                    while (len_remaining > 0) {
+                        int len = dataInputStream.read(buffer, read, len_remaining);
+                        if(len >= 0) {
+                            read += len;
+                            len_remaining -= len;
+                            if (!len_found && read >= Modbus.TCP_HEADER_LENGTH) {
 
-                    // The transaction ID must be treated as an unsigned short in
-                    // order for validation to work correctly.
+                                /*
+                                * The transaction ID is the first word (offset 0) in the
+                                * data that was just read. It will be echoed back to the
+                                * requester.
+                                *
+                                * The protocol ID is the second word (offset 2) in the
+                                * data. It should always be 0, but I don't check.
+                                *
+                                * The length of the payload is the third word (offset 4) in
+                                * the data that was just read. That's what I need in order
+                                * to read the rest of the response.
+                                */
+                                transaction = ModbusUtil.registerToShort(buffer, 0) & 0x0000FFFF;
+                                protocol = ModbusUtil.registerToShort(buffer, 2);
+                                count = ModbusUtil.registerToShort(buffer, 4);
 
-                    int transaction = ModbusUtil.registerToShort(buffer, 0) & 0x0000FFFF;
-                    int protocol = ModbusUtil.registerToShort(buffer, 2);
-                    int count = ModbusUtil.registerToShort(buffer, 4);
-
-                    if (dataInputStream.read(buffer, 6, count) == -1) {
-                        throw new ModbusIOException("Premature end of stream (Message truncated)");
+                                len_remaining = (Modbus.TCP_HEADER_LENGTH + count) - read;
+                                len_found = true;
+                            }
+                        }
+                        else {
+                            throw new ModbusIOException("Premature end of stream (Header truncated)");
+                        }
                     }
 
                     logger.debug("Read: {}", ModbusUtil.toHex(buffer, 0, count + 6));
 
-                    byteInputStream.reset(buffer, (6 + count));
+                    byteInputStream.reset(buffer, (Modbus.TCP_HEADER_LENGTH + count));
                     byteInputStream.skip(6);
 
                     int unit = byteInputStream.readByte();
@@ -304,31 +327,46 @@ public class ModbusTCPTransport extends AbstractModbusTransport {
                 byte[] buffer = byteInputStream.getBuffer();
                 logger.debug("Read: {}", ModbusUtil.toHex(buffer, 0, byteInputStream.count));
                 if (!headless) {
-                    // All Modbus TCP transactions start with 6 bytes. Get them.
-                    if (dataInputStream.read(buffer, 0, 6) == -1) {
-                        throw new ModbusIOException("Premature end of stream (Header truncated)");
+
+                    int len_remaining = Modbus.TCP_HEADER_LENGTH;
+                    int read = 0;
+                    int transaction = 0;
+                    int protocol = 0;
+                    int count = 0;
+                    boolean len_found = false;
+                    while (len_remaining > 0) {
+                        int len = dataInputStream.read(buffer, read, len_remaining);
+                        if(len >= 0) {
+                            read += len;
+                            len_remaining -= len;
+                            if (!len_found && read >= Modbus.TCP_HEADER_LENGTH) {
+
+                            /*
+                            * The transaction ID is the first word (offset 0) in the
+                            * data that was just read. It will be echoed back to the
+                            * requester.
+                            *
+                            * The protocol ID is the second word (offset 2) in the
+                            * data. It should always be 0, but I don't check.
+                            *
+                            * The length of the payload is the third word (offset 4) in
+                            * the data that was just read. That's what I need in order
+                            * to read the rest of the response.
+                            */
+                                transaction = ModbusUtil.registerToShort(buffer, 0) & 0x0000FFFF;
+                                protocol = ModbusUtil.registerToShort(buffer, 2);
+                                count = ModbusUtil.registerToShort(buffer, 4);
+
+                                len_remaining = (Modbus.TCP_HEADER_LENGTH + count) - read;
+                                len_found = true;
+                            }
+                        }
+                        else {
+                            throw new ModbusIOException("Premature end of stream (Header truncated)");
+                        }
                     }
 
-                    /*
-                     * The transaction ID is the first word (offset 0) in the
-                     * data that was just read. It will be echoed back to the
-                     * requester.
-                     *
-                     * The protocol ID is the second word (offset 2) in the
-                     * data. It should always be 0, but I don't check.
-                     *
-                     * The length of the payload is the third word (offset 4) in
-                     * the data that was just read. That's what I need in order
-                     * to read the rest of the response.
-                     */
-                    int transaction = ModbusUtil.registerToShort(buffer, 0) & 0x0000FFFF;
-                    int protocol = ModbusUtil.registerToShort(buffer, 2);
-                    int count = ModbusUtil.registerToShort(buffer, 4);
-
-                    if (dataInputStream.read(buffer, 6, count) == -1) {
-                        throw new ModbusIOException("Premature end of stream (Message truncated)");
-                    }
-                    byteInputStream.reset(buffer, (6 + count));
+                    byteInputStream.reset(buffer, (Modbus.TCP_HEADER_LENGTH + count));
                     byteInputStream.reset();
                     byteInputStream.skip(7);
                     int function = byteInputStream.readUnsignedByte();

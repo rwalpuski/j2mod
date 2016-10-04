@@ -311,6 +311,11 @@ public interface Modbus {
     int MAX_TRANSACTION_ID = Short.MAX_VALUE;
 
     /**
+     *  Defines the Modbus TCP Header length
+     */
+    int TCP_HEADER_LENGTH = 6;
+
+    /**
      * Defines the serial encoding "ASCII".
      */
     String SERIAL_ENCODING_ASCII = "ascii";
